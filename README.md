@@ -1,14 +1,17 @@
-Xây dựng **phòng livestream bằng WHIP/WHEP của Cloudflare**, sử dụng **MongoDB** làm database.
+Xây dựng **phòng livestream bằng của Cloudflare stream**, sử dụng **samrtcontract**.
 
 ---
 
 ## 🚀 **Tổng Quan Luồng Thực Thi**
-- **Streamer (Broadcaster)**: Gửi video/audio lên Cloudflare bằng **WHIP**.  
-- **Viewer (Người xem)**: Nhận video/audio từ Cloudflare bằng **WHEP**.  
-- **Backend**:  
-  - Quản lý phòng livestream (tạo, cập nhật, kết thúc).  
+- **Streamer (Broadcaster)**: Gửi endpoint lên Cloudflare.
+- **Cloudflare**: Trả **Ingest URL** và **Stream Key**.
+- **OBS** ( hoặc webRTC): Truyền**Ingest URL** và **Stream Key** vào OBS để gửi video/audio lên cloudfalre.
+- **Viewer (Người xem)**: Nhận video/audio từ Cloudflare bằng **playback**.
+- **Backend**:
   - Cung cấp API cho streamer và viewer để kết nối với Cloudflare.  
-  - Lưu trữ thông tin phòng livestream trong MongoDB.  
+- **SmartContract**:  
+  - Quản lý phòng livestream (tạo, cập nhật, kết thúc).  
+  - Lưu trữ thông tin phòng livestream  
 
 ---
 
