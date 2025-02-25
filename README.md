@@ -55,13 +55,14 @@ curl https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/stream/live_input
 ```
 
 {
-	"0": "string: sessionId 0b8f3d17b433bc32577ea9b92485ecc4",
-	"1": "string: ingestUrl rtmps://live.cloudflare.com:443/live/",
-	"2": "string: streamKey 664fa71b4e5b009baab737017bb7fe8fk0b8f3d17b433bc32577ea9b92485ecc4",
-	"3": "string: host 42134",
-	"4": "string: title uytu",
-	"5": "string: status ended",
-	"6": "uint256: createdAt 1740459840"
+	"0": "string: rooomId 1740459830563640",
+	"1": "string: sessionId 0b8f3d17b433bc32577ea9b92485ecc4",
+	"2": "string: ingestUrl rtmps://live.cloudflare.com:443/live/",
+	"3": "string: streamKey 664fa71b4e5b009baab737017bb7fe8fk0b8f3d17b433bc32577ea9b92485ecc4",
+	"4": "string: host 42134",
+	"5": "string: title uytu",
+	"6": "string: status ended",
+	"7": "uint256: createdAt 1740459840"
 }
 ```
 
