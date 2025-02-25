@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+    <script src="/view/contractConfig.js"></script>
+  </head>
+  <body>
+    <h1>Viewer</h1>
+
+    <!-- Thêm ô nhập Room ID -->
+    <label for="roomIdInput">Room ID:</label>
+    <input type="text" id="roomIdInput" placeholder="Enter Room ID" />
+
+    <button id="joinStream">Join Stream</button>
+
+    <iframe
+      id="player"
+      width="640"
+      height="360"
+      frameborder="0"
+      allow="autoplay; encrypted-media"
+      allowfullscreen
+    ></iframe>
+
+    <script type="module">
+      import { init, contract } from "./assets/connection.js"; // Chỉ cần import một lần
+
+      async function start() {
+        await init(); // Gọi hàm init() để kết nối ví và khởi tạo hợp đồng
+      }
+
+      // Gọi hàm init() khi trang tải lên
+      window.addEventListener("load", init);
+      document
+        .getElementById("joinStream")
+        .addEventListener("click", async () => {
+          const roomId = document.getElementById("roomIdInput").value; // Nhập roomId từ input
+
+          if (!roomId) {
+            alert("Please enter a Room ID");
+            return;
+          }
+
+          try {
+            const livestreamInfo = await contract.methods
+              .getLivestreamInfo(roomId)
+              .call();
+            // Kiểm tra trạng thái của livestream
+            if (livestreamInfo.status !== "active") {
+              alert("The livestream is not active.");
+              return;
+            }
+            console.log("Livestream Info:", livestreamInfo.sessionId);
+
+            const response = await fetch(
+              `/api/livestream?sessionId=${livestreamInfo.sessionId}`
+            );
+
+            // Kiểm tra nếu phản hồi không ở dạng JSON (lỗi)
+            if (!response.ok) {
+              const errorText = await response.text(); // Lấy phản hồi dạng text
+              alert("Error: " + errorText);
+              return;
+            }
+
+            // Nếu phản hồi OK, xử lý dữ liệu JSON
+            const data = await response.json();
+            // Lấy URL Preview từ kết quả
+            const previewUrl = data.preview;
+            console.log("Preview URL from Cloudflare:", previewUrl);
+
+            if (!previewUrl) {
+              throw new Error("Preview URL is undefined");
+            }
+
+            // Gán URL Preview vào thuộc tính src của iframe
+            document.getElementById("player").src = previewUrl;
+          } catch (error) {
+            console.error("Error joining livestream:", error);
+            alert(
+              `Error joining livestream: ${error.message}. Check console for details.`
+            );
+          }
+        });
+    </script>
+  </body>
+</html>

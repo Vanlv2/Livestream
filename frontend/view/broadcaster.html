@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Broadcaster</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+  </head>
+  <body>
+    <h1>Broadcaster</h1>
+    <input type="text" id="title" placeholder="Enter stream title" />
+    <input type="text" id="host" placeholder="Enter host name" />
+    <button id="createStream">Create Live Input</button>
+    <div>
+      <br />
+      <input type="text" id="roomIdUpdate" placeholder="Enter Room ID" />
+      <input type="text" id="updateTitleInput" placeholder=" Update title" />
+      <button id="updateStream">Update</button>
+    </div>
+    <br />
+    <div>
+      <input type="text" id="roomIdInput" placeholder="Enter Room ID" />
+      <button id="endStream">End Stream</button>
+    </div>
+    <div id="streamInfo">
+      <p id="roomId"></p>
+      <p id="ingestInfo"></p>
+      <p id="streamKey"></p>
+      <p id="titleStream"></p>
+    </div>
+
+    <script type="module">
+      import { init, contract } from "./assets/connection.js"; // Chỉ cần import một lần
+
+      async function start() {
+        await init(); // Gọi hàm init() để kết nối ví và khởi tạo hợp đồng
+      }
+
+      window.addEventListener("load", start);
+      function generateRoomId() {
+        const timestamp = Date.now(); // Lấy thời gian hiện tại (milisecond)
+        const randomNum = Math.floor(Math.random() * 1000); // Số ngẫu nhiên
+        return `${timestamp}${randomNum}`;
+      }
+
+      document
+        .getElementById("endStream")
+        .addEventListener("click", async () => {
+          const roomId = document.getElementById("roomIdInput").value; // Nhập roomId từ input
+
+          if (!roomId) {
+            alert("Please enter a Room ID to end the stream");
+            return;
+          }
+
+          try {
+            // Gọi hàm endLivestream từ hợp đồng thông minh
+            await contract.methods
+              .endLivestream(roomId)
+              .send({ from: web3.currentProvider.selectedAddress });
+
+            alert("Livestream has been ended successfully.");
+            console.log(`Livestream with Room ID: ${roomId} has been ended.`);
+          } catch (error) {
+            console.error("Error ending livestream:", error);
+            alert("Error ending livestream. Check console for details.");
+          }
+        });
+
+      document
+        .getElementById("updateStream")
+        .addEventListener("click", async () => {
+          const roomId = document.getElementById("roomIdUpdate").value;
+          const newTitle = document.getElementById("updateTitleInput").value;
+
+          if (!roomId || !newTitle) {
+            alert("Please fill in both Room ID and the new title.");
+            return;
+          }
+
+          try {
+            await contract.methods
+              .updateTitle(roomId, newTitle)
+              .send({ from: web3.currentProvider.selectedAddress });
+
+            document.getElementById("titleStream").textContent =
+              "Title: " + newTitle;
+            alert("Title updated successfully");
+          } catch (error) {
+            console.error("Error updating title:", error);
+            alert("Failed to update title");
+          }
+        });
+      // Xử lý sự kiện click vào nút
+      document
+        .getElementById("createStream")
+        .addEventListener("click", async () => {
+          const title = document.getElementById("title").value;
+          const host = document.getElementById("host").value;
+          const roomId = generateRoomId();
+          console.log("roomId:", roomId);
+
+          if (!contract) {
+            alert("Contract chưa được khởi tạo!");
+            return;
+          }
+
+          try {
+            const response = await fetch("/api/create", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title, host }),
+            });
+            
+            if (!response.ok) {
+              throw new Error("Error from backend");
+            }
+
+            const data = await response.json();
+            const sessionId = data.sessionId;
+            const ingestUrl = data.ingestUrl;
+            const streamKey = data.streamKey;
+            // Gọi phương thức createLivestream qua contract.methods
+            const tx = await contract.methods
+              .createLivestream(
+                roomId,
+                sessionId,
+                ingestUrl,
+                streamKey,
+                host,
+                title
+              )
+              .send({ from: web3.currentProvider.selectedAddress });
+
+            console.log("Transaction successful:", tx);
+
+            document.getElementById("roomId").textContent =
+              "Room id: " + roomId;
+            document.getElementById("ingestInfo").textContent =
+              "Ingest URL: " + ingestUrl;
+            document.getElementById("streamKey").textContent =
+              "Stream Key: " + streamKey;
+            document.getElementById("titleStream").textContent =
+              "Title: " + title;
+          } catch (error) {
+            console.error(error);
+            alert("Error creating live input or interacting with blockchain");
+          }
+        });
+    </script>
+  </body>
+</html>
