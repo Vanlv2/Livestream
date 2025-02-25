@@ -102,7 +102,6 @@ curl -X GET "https://api.cloudflare.com/client/v4/accounts/{AccountID/stream/liv
 
 #### **Cập nhật Satmartcontract status ended**
 
-```
 ✅ **Livestream kết thúc, viewer không thể xem nữa.**  
 
 ---
@@ -110,10 +109,10 @@ curl -X GET "https://api.cloudflare.com/client/v4/accounts/{AccountID/stream/liv
 # 🔥 **Tóm tắt nhiệm vụ của Backend**
 | **Chức năng** | **API** | **Nhiệm vụ Backend** |
 |--------------|--------|-----------------|
-| **Tạo phòng livestream** | `POST /api/livestream/create` | Tạo session WHIP, lưu MongoDB |
-| **Người livestream gửi dữ liệu** | Thực hiện ở phía front end| Không cần backend xử lý |
-| **Người xem tham gia** | `GET /api/livestream/join` | Lấy session từ MongoDB, gọi API lấy WHEP URL |
-| **Viewer kết nối WebRTC** | **(Frontend dùng WHEP URL)** | Không cần backend xử lý |
-| **Kết thúc livestream** | `POST /api/livestream/end` | Xóa session trên Cloudflare, cập nhật MongoDB |
+| **Tạo phòng livestream** | `POST /api/create` | Gọi API Cloudflare để tạo session, lưu thông tin SMC |
+| **Người livestream gửi dữ liệu** | Frontend sử dụng OBS/WebRTC| Không cần backend xử lý |
+| **Người xem tham gia** | `GET /api/livestream` | Lấy session từ SMC, gọi API lấy playback URL |
+| **Viewer kết nối OBS (WebRTC)** | **(Frontend dùng playback URL)** | Không cần backend xử lý |
+| **Kết thúc livestream** | frontend xoá trên SMC| cập nhật trạng thái SMC |
 
 ---
