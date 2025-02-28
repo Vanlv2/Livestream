@@ -13,13 +13,14 @@ import (
 )
 
 func main() {
-	
+
 	_ = godotenv.Load()
 
 	r := mux.NewRouter()
 
-	r.HandleFunc("/api/create", handler.CreateLiveInput).Methods("POST")
-	r.HandleFunc("/api/livestream", handler.GetVideos).Methods("GET")
+	r.HandleFunc("/api/livestream/create", handler.CreateLiveInput).Methods("POST")
+	r.HandleFunc("/api/livestream/uploadStream", handler.UploadStream).Methods("POST")
+	r.HandleFunc("/api/livestream/join", handler.GetVideos).Methods("GET")
 
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./frontend/assets"))))
 

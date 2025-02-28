@@ -32,6 +32,9 @@
     <script type="module">
       import { init, contract } from "./assets/connection.js"; // Chỉ cần import một lần
 
+      let localStream;
+      let peerConnection;
+      let publishedTracks = new Set();
       async function start() {
         await init(); // Gọi hàm init() để kết nối ví và khởi tạo hợp đồng
       }
@@ -66,7 +69,7 @@
             alert("Error ending livestream. Check console for details.");
           }
         });
-
+        //upload stream
       document
         .getElementById("updateStream")
         .addEventListener("click", async () => {
@@ -105,43 +108,134 @@
             return;
           }
 
+          if (!web3.currentProvider.selectedAddress) {
+            alert("Vui lòng kết nối ví MetaMask!");
+            return;
+          }
+
           try {
-            const response = await fetch("/api/create", {
+            const response = await fetch("/api/livestream/create", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ title, host }),
             });
-            
+
             if (!response.ok) {
-              throw new Error("Error from backend");
+              throw new Error(
+                `Error from backend: ${response.status} ${response.statusText}`
+              );
             }
 
             const data = await response.json();
-            const sessionId = data.sessionId;
-            const ingestUrl = data.ingestUrl;
-            const streamKey = data.streamKey;
-            // Gọi phương thức createLivestream qua contract.methods
-            const tx = await contract.methods
-              .createLivestream(
-                roomId,
-                sessionId,
-                ingestUrl,
-                streamKey,
-                host,
-                title
-              )
-              .send({ from: web3.currentProvider.selectedAddress });
+                const sessionId = data.sessionId;
+                const ingestUrl = data.WebRTC;
+                const streamKey = data.WebRTCPlayback;
+                console.log("sessionId:", sessionId);
+            
+            navigator.mediaDevices
+              .getUserMedia({ video: true, audio: true })
+              .then(async (stream) => {
+                localStream = stream;
+                console.log(
+                  "Luồng cục bộ đã được lấy thành công:",
+                  localStream
+                );
+                peerConnection = new RTCPeerConnection();
+                await publishStream();
+              })
+              .catch((error) => {
+                console.error("Lỗi khi lấy luồng cục bộ:", error);
+                alert(
+                  "Không thể lấy luồng video/audio. Vui lòng kiểm tra quyền truy cập và thử lại."
+                );
+              });
 
-            console.log("Transaction successful:", tx);
+            async function publishStream() {
+              if (!localStream || !peerConnection) return;
 
-            document.getElementById("roomId").textContent =
-              "Room id: " + roomId;
-            document.getElementById("ingestInfo").textContent =
-              "Ingest URL: " + ingestUrl;
-            document.getElementById("streamKey").textContent =
-              "Stream Key: " + streamKey;
-            document.getElementById("titleStream").textContent =
-              "Title: " + title;
+              const transceivers = [];
+              for (const track of localStream.getTracks()) {
+                if (publishedTracks.has(track.id)) continue;
+                if (track.readyState !== "live") continue;
+
+                const tx = peerConnection.addTransceiver(track, {
+                  direction: "sendonly",
+                });
+                transceivers.push(tx);
+                publishedTracks.add(track.id);
+              }
+
+              if (transceivers.length === 0) return;
+
+              const offer = await peerConnection.createOffer();
+              await peerConnection.setLocalDescription(offer);
+
+              const trackInfos = transceivers.map(({ sender, mid }) => ({
+                location: "local",
+                mid,
+                trackName: sender.track.id,
+              }));
+              const body = {
+                offer: { sdp: offer.sdp, type: offer.type },
+                tracks: trackInfos,
+                metadata: {},
+              };
+
+              try {
+                const publishResponse = await fetch(
+                  "/api/livestream/uploadStream",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                  }
+                );
+               console.log("publishResponse--------:", publishResponse.headers);
+               console.log("body--------:",publishResponse.body);
+                if (!publishResponse.ok) {
+                  throw new Error(
+                    `Publish error: Failed to upload stream: ${publishResponse.status} ${publishResponse.statusText}`
+                  );
+                }
+
+                const resp = await publishResponse.json();
+
+                if (resp.errorCode) {
+                  console.error("Publish error:", resp.errorDescription);
+                  alert(`Publish error: ${resp.errorDescription}`);
+                  return;
+                }
+
+                const answer = resp.sessionDescription;
+                console.log("SFU Answer:", answer.sdp);
+                await peerConnection.setRemoteDescription(answer);
+                console.log("Publish => success. Applied SFU answer.");
+
+                const tx = await contract.methods
+                  .createLivestream(
+                    roomId,
+                    sessionId,
+                    ingestUrl,
+                    streamKey,
+                    host,
+                    title
+                  )
+                  .send({ from: web3.currentProvider.selectedAddress });
+                console.log("Transaction successful:", tx);
+
+                document.getElementById("roomId").textContent =
+                  "Room id: " + roomId;
+                document.getElementById("ingestInfo").textContent =
+                  "Ingest URL: " + ingestUrl;
+                document.getElementById("streamKey").textContent =
+                  "Stream Key: " + streamKey;
+                document.getElementById("titleStream").textContent =
+                  "Title: " + title;
+              } catch (publishError) {
+                console.error("Error publishing stream:", publishError);
+                alert("Error publishing stream. Check console for details.");
+              }
+            }
           } catch (error) {
             console.error(error);
             alert("Error creating live input or interacting with blockchain");

@@ -14,18 +14,20 @@ import (
 var currentSession *LiveInputSession
 
 type LiveInputSession struct {
-	SessionID string `json:"sessionId"`
-	IngestURL string `json:"ingestUrl"`
-	StreamKey string `json:"streamKey"`
+	SessionID      string `json:"sessionId"`
+	WebRTC         string `json:"WebRTC"`
+	WebRTCPlayback string `json:"WebRTCPlayback"`
 }
 
 type LiveInputResponse struct {
 	Result struct {
-		UID     string `json:"uid"`
-		RTMPS   struct {
-			URL       string `json:"url"`
-			StreamKey string `json:"streamKey"`
-		} `json:"rtmps"`
+		UID    string `json:"uid"`
+		WebRTC struct {
+			URL string `json:"url"`
+		} `json:"webRTC"`
+		WebRTCPlayback struct {
+			URL string `json:"url"`
+		} `json:"webRTCPlayback"`
 	} `json:"result"`
 	Success bool `json:"success"`
 }
@@ -90,14 +92,85 @@ func CreateLiveInput(w http.ResponseWriter, r *http.Request) {
 	}
 
 	currentSession = &LiveInputSession{
-		SessionID: cloudflareResponse.Result.UID,
-		IngestURL: cloudflareResponse.Result.RTMPS.URL,
-		StreamKey: cloudflareResponse.Result.RTMPS.StreamKey,
+		SessionID:      cloudflareResponse.Result.UID,
+		WebRTC:         cloudflareResponse.Result.WebRTC.URL,
+		WebRTCPlayback: cloudflareResponse.Result.WebRTCPlayback.URL,
 	}
-	fmt.Printf("Current session details: %+v\n", currentSession)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(currentSession)
+}
+
+// API để nhận video stream từ client và đẩy lên Cloudflare
+func UploadStream(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Handling UploadStream request")
+
+	if currentSession == nil {
+		http.Error(w, "No active streaming session", http.StatusBadRequest)
+		fmt.Println("No active streaming session")
+		return
+	}
+
+	// Struct to decode JSON
+	var req struct {
+		Offer  string `json:"offer"` // Changed to string to handle SDP
+		Tracks []struct {
+			TrackName string `json:"trackName"`
+			Mid       string `json:"mid"`
+			Location  string `json:"location"`
+		} `json:"tracks"`
+		Force bool `json:"force"`
+	}
+
+	// Read and decode request body
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Error parsing JSON", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Received tracks:", req.Tracks)
+
+	// Prepare track data
+	tracks := make([]map[string]interface{}, len(req.Tracks))
+	for i, t := range req.Tracks {
+		location := t.Location
+		if location == "" {
+			location = "local"
+		}
+		tracks[i] = map[string]interface{}{
+			"trackName": t.TrackName,
+			"location":  location,
+			"mid":       t.Mid,
+		}
+	}
+	requestBody := map[string]interface{}{
+		"sessionDescription": req.Offer,
+		"tracks":             tracks,
+	}
+
+	jsonData, _ := json.Marshal(requestBody)
+
+	// Create request body as SDP content
+	client := &http.Client{}
+	cfReq, err := http.NewRequest("POST", currentSession.WebRTC, bytes.NewBuffer(jsonData))
+	if err != nil {
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
+		return
+	}
+
+	// Set correct headers for SDP content
+	cfReq.Header.Set("Content-Type", "application/sdp")
+	cfReq.Header.Set("Authorization", "Bearer "+os.Getenv("CLOUDFLARE_API_KEY"))
+
+	resp, err := client.Do(cfReq)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		http.Error(w, "Failed to upload stream", resp.StatusCode)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 func GetVideos(w http.ResponseWriter, r *http.Request) {
@@ -169,5 +242,3 @@ func GetVideos(w http.ResponseWriter, r *http.Request) {
 		"preview":     activeVideo.Preview,      // xem video có sẵn
 	})
 }
-
-

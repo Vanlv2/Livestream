@@ -56,7 +56,7 @@
             console.log("Livestream Info:", livestreamInfo.sessionId);
 
             const response = await fetch(
-              `/api/livestream?sessionId=${livestreamInfo.sessionId}`
+              `/api/livestream/join?sessionId=${livestreamInfo.sessionId}`
             );
 
             // Kiểm tra nếu phản hồi không ở dạng JSON (lỗi)
